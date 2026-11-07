@@ -27,6 +27,7 @@ jobs:
         run: |
           mkdir -p www
           cp app/index.html app/style.css app/app.js www/
+          echo "window.APP_BUILD = ${{ github.run_number }};" > www/version.js
           npx esbuild native/native.js --bundle --minify --format=iife --outfile=www/native.js
       - name: Create Android project
         run: |
@@ -48,4 +49,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest Daily-Edit.apk --title "Daily Edit (latest APK)" --notes "Download Daily-Edit.apk and install it on your Android phone." --target "${{ github.sha }}"
+          gh release create latest Daily-Edit.apk --title "Daily Edit (latest APK)" --notes "Download Daily-Edit.apk and install it on your Android phone. build: ${{ github.run_number }}" --target "${{ github.sha }}"

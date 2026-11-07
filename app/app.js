@@ -314,3 +314,27 @@ $("btnSend").onclick = async () => {
   }
 };
 $("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("btnSend").click(); } });
+
+/* ---------- in-app update ---------- */
+const REPO = "alamgirabdullahgh/Daily-Editing";
+const APK_URL = `https://github.com/${REPO}/releases/download/latest/Daily-Edit.apk`;
+async function checkUpdate(manual) {
+  const cur = window.APP_BUILD || 0;
+  if (!cur && !window.DailyNative) { if (manual) addMsg("bot", "এটি ওয়েব সংস্করণ, রিফ্রেশ করলেই সর্বশেষটি পাবেন।"); return; }
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/latest`, { headers: { Accept: "application/vnd.github+json" } });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    const m = /build:\s*(\d+)/.exec(j.body || "");
+    const latest = m ? +m[1] : 0;
+    if (latest > cur) {
+      const d = addMsg("bot", `🔄 নতুন সংস্করণ আছে (build ${latest}, আপনার build ${cur})।<br><button class="upd">এখনই আপডেট করুন</button><br><span class="hint">APK নামলে খুলে "Install/Update" চাপুন।</span>`);
+      d.querySelector(".upd").onclick = () => (window.DailyNative ? window.DailyNative.openUrl(APK_URL) : window.open(APK_URL, "_blank"));
+    } else if (manual) addMsg("bot", `✅ আপনি সর্বশেষ সংস্করণেই আছেন (build ${cur})।`);
+  } catch (e) {
+    if (manual) addMsg("bot err", "আপডেট যাচাই করা যায়নি: " + esc(e.message || e));
+  }
+}
+$("btnUpdate").onclick = () => checkUpdate(true);
+$("verInfo").textContent = "সংস্করণ: build " + (window.APP_BUILD || "dev");
+setTimeout(() => checkUpdate(false), 1500);

@@ -9,7 +9,7 @@
 <body>
 <header>
   <h1>Daily Edit</h1>
-  <button id="btnSettings" title="সেটিংস">⚙️</button>
+  <div class="hb"><button id="btnUpdate" title="আপডেট যাচাই করুন">🔄</button><button id="btnSettings" title="সেটিংস">⚙️</button></div>
 </header>
 
 <main id="chat" aria-live="polite">
@@ -50,12 +50,14 @@
     <label>অডিও (TTS) মডেল <input id="mTts"></label>
     <label>ছবি (Nano Banana) মডেল <input id="mImg"></label>
   </details>
+  <p class="hint" id="verInfo"></p>
   <div class="row">
     <button id="btnSave">সংরক্ষণ</button>
     <button id="btnClose" class="ghost">বন্ধ</button>
   </div>
 </dialog>
 
+<script src="version.js"></script>
 <script src="native.js"></script>
 <script src="app.js"></script>
 </body>
