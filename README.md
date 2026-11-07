@@ -1,13 +1,27 @@
-# Daily Editing
+# Daily Edit
 
 A lightweight, free, AI-first editing studio. Small in size, powerful in results.
 
-## Vision
-- Audio: generated with AI Studio's audio/TTS functions
-- Video: generated with Google Vids, YouTube Shorts-style video creation
-- Posts and text: generated with Gemini
-- Image tools: AI background removal and more
-- Online AI (cloud models) and offline AI (on-device models) both supported
+## Phase 1: Chat to complete video (`app/`)
+Type a request such as "make a video of a deer's story". The app then does everything in one go:
 
-## Status
-Planning. Architecture and feature list coming next.
+1. **Script**: Gemini writes the title, scenes, narration and image prompts.
+2. **Voice**: Gemini TTS (AI Studio audio) makes the narration for each scene.
+3. **Images**: Nano Banana (Gemini image model) makes one image per scene in a consistent style.
+4. **Video**: images (slow zoom) + voice + subtitles are combined in the browser and exported as a downloadable file.
+
+No server and no install. Everything except the Gemini API calls runs on your device.
+
+### Run
+Open `app/index.html` in Chrome, or host the `app/` folder on GitHub Pages. Tap the gear icon and paste your Gemini API key (from Google AI Studio). The key stays in your browser's localStorage.
+
+### Notes
+- Model names are editable in settings, because Google renames models often.
+- Recording happens in real time: a 60-second video takes about 60 seconds to assemble. Keep the tab open.
+- Google Vids and YouTube Shorts creation have no public API, so Phase 1 assembles the video itself. Veo (Gemini video model) can be added later for animated clips.
+
+## Roadmap
+- Background removal (offline, on-device)
+- Veo clips as an optional scene type
+- Posts and captions with Gemini
+- Offline AI models
