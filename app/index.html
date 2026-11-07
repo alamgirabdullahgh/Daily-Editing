@@ -25,8 +25,8 @@
 <dialog id="dlg">
   <h2>সেটিংস</h2>
   <p class="hint">Key শুধু আপনার ডিভাইসেই থাকে (localStorage), কোথাও পাঠানো হয় না, শুধু গুগলের API-তে যায়।</p>
-  <label>Gemini API Key
-    <input id="sKey" type="password" autocomplete="off" placeholder="AIza...">
+  <label>Gemini API Key (এক লাইনে একটি। একাধিক দিলে কোটা শেষ হলে নিজে অন্যটিতে সুইচ করবে)
+    <textarea id="sKey" rows="3" autocomplete="off" spellcheck="false" placeholder="AIza...&#10;AIza..."></textarea>
   </label>
   <label>ভিডিওর ধরন
     <select id="sRatio">
@@ -45,7 +45,7 @@
     </select>
   </label>
   <details>
-    <summary>মডেল (পরিবর্তন দরকার হলে)</summary>
+    <summary>মডেল (কমা দিয়ে একাধিক দিন, প্রথমটি আগে চেষ্টা হবে)</summary>
     <label>স্ক্রিপ্ট মডেল <input id="mText"></label>
     <label>অডিও (TTS) মডেল <input id="mTts"></label>
     <label>ছবি (Nano Banana) মডেল <input id="mImg"></label>

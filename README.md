@@ -20,6 +20,12 @@ Every push to `main` builds `Daily-Edit.apk` with GitHub Actions (Capacitor, deb
 `https://github.com/alamgirabdullahgh/Daily-Editing/releases/latest`. Open that page on your phone, download the APK and install it (allow "install unknown apps" for your browser when asked).
 In the app, the finished video is saved/shared through the Android share sheet.
 
+### Auto-switch (quota protection)
+Put several Gemini API keys in settings (one per line) and several models (comma separated).
+When a key or model hits its quota (429) or is busy, the app switches to the next one automatically.
+If everything is cooling down it waits (up to ~90 s) and retries. Bad keys or unknown models are skipped.
+Keys from the same Google project share one quota, so use keys from different projects or accounts.
+
 ### Notes
 - Model names are editable in settings, because Google renames models often.
 - Recording happens in real time: a 60-second video takes about 60 seconds to assemble. Keep the tab open.

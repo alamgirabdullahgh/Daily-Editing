@@ -1,20 +1,24 @@
 /* Daily Edit — chat -> script -> voice -> images -> finished video (all in the browser) */
 const API = "https://generativelanguage.googleapis.com/v1beta/models/";
 const DEFAULTS = {
-  key: "", ratio: "16:9", scenes: "6", voice: "Kore",
-  mText: "gemini-2.5-flash",
-  mTts: "gemini-2.5-flash-preview-tts",
-  mImg: "gemini-2.5-flash-image",
+  keys: "", ratio: "16:9", scenes: "6", voice: "Kore",
+  mText: "gemini-2.5-flash, gemini-2.5-flash-lite",
+  mTts: "gemini-2.5-flash-preview-tts, gemini-2.5-pro-preview-tts",
+  mImg: "gemini-2.5-flash-image, gemini-2.0-flash-preview-image-generation",
 };
 const $ = (id) => document.getElementById(id);
+const list = (x) => String(x || "").split(/[\n,]+/).map((v) => v.trim()).filter(Boolean);
 const cfg = () => {
   let s = {};
-  try { s = JSON.parse(localStorage.getItem("daily-edit-cfg") || "{}"); } catch (e) {}
+  try {
+    s = JSON.parse(localStorage.getItem("daily-edit-cfg2") || "null") || {};
+    if (!s.keys) { const o = JSON.parse(localStorage.getItem("daily-edit-cfg") || "{}"); if (o.key) s.keys = o.key; }
+  } catch (e) {}
   return { ...DEFAULTS, ...s };
 };
 
 /* ---------- settings ---------- */
-const fields = { key: "sKey", ratio: "sRatio", scenes: "sScenes", voice: "sVoice", mText: "mText", mTts: "mTts", mImg: "mImg" };
+const fields = { keys: "sKey", ratio: "sRatio", scenes: "sScenes", voice: "sVoice", mText: "mText", mTts: "mTts", mImg: "mImg" };
 $("btnSettings").onclick = () => {
   const c = cfg();
   for (const k in fields) $(fields[k]).value = c[k];
@@ -24,7 +28,7 @@ $("btnClose").onclick = () => $("dlg").close();
 $("btnSave").onclick = () => {
   const c = {};
   for (const k in fields) c[k] = $(fields[k]).value.trim();
-  try { localStorage.setItem("daily-edit-cfg", JSON.stringify(c)); } catch (e) {}
+  try { localStorage.setItem("daily-edit-cfg2", JSON.stringify(c)); } catch (e) {}
   $("dlg").close();
 };
 
@@ -41,20 +45,62 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* ---------- Gemini calls ---------- */
-async function gem(model, body, key, tries = 4) {
-  let last;
-  for (let i = 0; i < tries; i++) {
-    const r = await fetch(`${API}${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify(body),
-    });
-    if (r.ok) return r.json();
-    last = `${r.status} ${(await r.text()).slice(0, 300)}`;
-    if (![429, 500, 503].includes(r.status)) break;
-    await sleep(2000 * (i + 1));
+/* Auto-switch: tries every (key, model) pair; on quota errors it moves to the next
+   pair, and only waits when every pair is cooling down. */
+const dead = new Set();     // "key|model" that will never work (bad key / unknown model)
+const cool = new Map();     // "key|model" -> timestamp until which it is cooling down
+let notify = () => {};
+const retryMs = (txt) => {
+  if (/PerDay/i.test(txt)) return 3600_000;
+  const m = /"retryDelay":\s*"(\d+(?:\.\d+)?)s"/.exec(txt);
+  return m ? Math.ceil(+m[1] * 1000) + 1000 : 60_000;
+};
+
+async function gem(models, body, c) {
+  const keys = list(c.keys), mods = list(models);
+  if (!keys.length) throw new Error("কোনো API Key দেওয়া নেই (⚙️ থেকে দিন)");
+  let waits = 0, lastErr = "";
+  for (;;) {
+    let soonest = Infinity, alive = 0;
+    for (const m of mods) {
+      for (let ki = 0; ki < keys.length; ki++) {
+        const id = keys[ki] + "|" + m;
+        if (dead.has(id)) continue;
+        alive++;
+        const until = cool.get(id) || 0;
+        if (until > Date.now()) { soonest = Math.min(soonest, until); continue; }
+        let r;
+        try {
+          r = await fetch(`${API}${m}:generateContent`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-goog-api-key": keys[ki] },
+            body: JSON.stringify(body),
+          });
+        } catch (e) { lastErr = String(e.message || e); cool.set(id, Date.now() + 3000); soonest = Math.min(soonest, Date.now() + 3000); continue; }
+        if (r.ok) return r.json();
+        const txt = await r.text();
+        lastErr = `${r.status} ${txt.slice(0, 240)}`;
+        if (r.status === 429) {
+          cool.set(id, Date.now() + retryMs(txt)); soonest = Math.min(soonest, cool.get(id));
+          notify(`কোটা শেষ (Key ${ki + 1} · ${m}), অন্যটিতে সুইচ করছি...`);
+        } else if (r.status === 500 || r.status === 503) {
+          cool.set(id, Date.now() + 5000); soonest = Math.min(soonest, cool.get(id));
+          notify(`${m} ব্যস্ত, অন্যটিতে সুইচ করছি...`);
+        } else if ([400, 401, 403, 404].includes(r.status)) {
+          dead.add(id); alive--;
+          notify(`Key ${ki + 1} · ${m} কাজ করছে না (${r.status}), বাদ দিয়ে সুইচ করছি...`);
+        } else throw new Error(lastErr);
+      }
+    }
+    if (!alive) throw new Error("কোনো Key/মডেল কাজ করছে না। শেষ ত্রুটি: " + lastErr);
+    const wait = soonest - Date.now();
+    if (!isFinite(soonest) || wait <= 0) continue;
+    if (wait > 90_000 || ++waits > 5) throw new Error("সব Key ও মডেলের কোটা শেষ। নতুন Key যোগ করুন বা পরে চেষ্টা করুন। শেষ ত্রুটি: " + lastErr);
+    for (let left = Math.ceil(wait / 1000); left > 0; left--) {
+      notify(`সব কোটা শেষ, ${left} সেকেন্ড অপেক্ষা করে আবার চেষ্টা...`);
+      await sleep(1000);
+    }
   }
-  throw new Error(last);
 }
 
 async function writeScript(topic, c) {
@@ -80,7 +126,7 @@ style: সব ছবির জন্য একই আর্ট স্টাই�
         required: ["title", "style", "scenes"],
       },
     },
-  }, c.key);
+  }, c);
   const t = j.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
   const s = JSON.parse(t.replace(/```json|```/g, "").trim());
   if (!s.scenes?.length) throw new Error("স্ক্রিপ্ট খালি এসেছে");
@@ -94,7 +140,7 @@ async function makeVoice(text, c, actx) {
       responseModalities: ["AUDIO"],
       speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: c.voice } } },
     },
-  }, c.key);
+  }, c);
   const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
   if (!part) throw new Error("অডিও আসেনি");
   const rate = +(/rate=(\d+)/.exec(part.inlineData.mimeType || "") || [0, 24000])[1];
@@ -113,8 +159,8 @@ async function makeVoice(text, c, actx) {
 async function makeImage(prompt, style, c) {
   const j = await gem(c.mImg, {
     contents: [{ parts: [{ text: `${prompt}\n\nStyle: ${style}\nAspect ratio ${c.ratio}. No text, letters or watermarks.` }] }],
-    generationConfig: { responseModalities: ["IMAGE"] },
-  }, c.key);
+    generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+  }, c);
   const part = j.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
   if (!part) throw new Error("ছবি আসেনি");
   const blob = await (await fetch(`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`)).blob();
@@ -203,7 +249,7 @@ $("btnSend").onclick = async () => {
   const topic = $("prompt").value.trim();
   const c = cfg();
   if (busy || !topic) return;
-  if (!c.key) { $("btnSettings").click(); return; }
+  if (!list(c.keys).length) { $("btnSettings").click(); return; }
   busy = true; $("btnSend").disabled = true; $("prompt").value = "";
   addMsg("user", esc(topic));
   const bot = addMsg("bot", `<b>কাজ চলছে...</b><ul class="steps"></ul>`);
@@ -213,21 +259,23 @@ $("btnSend").onclick = async () => {
     li.scrollIntoView({ block: "end" });
     return { set: (t) => (li.textContent = t), ok: () => (li.className = "done"), fail: () => (li.className = "fail") };
   };
+  let cur = null;
+  notify = (m) => cur && cur.set(m);
   const actx = new (window.AudioContext || window.webkitAudioContext)();
   try {
-    let st = step("স্ক্রিপ্ট লেখা হচ্ছে");
+    let st = cur = step("স্ক্রিপ্ট লেখা হচ্ছে");
     const script = await writeScript(topic, c);
     st.set(`স্ক্রিপ্ট তৈরি: ${script.title} (${script.scenes.length}টি দৃশ্য)`); st.ok();
 
     const scenes = script.scenes.map((s) => ({ ...s }));
-    st = step("ভয়েস (অডিও) তৈরি হচ্ছে");
+    st = cur = step("ভয়েস (অডিও) তৈরি হচ্ছে");
     for (let i = 0; i < scenes.length; i++) {
       st.set(`ভয়েস তৈরি হচ্ছে ${i + 1}/${scenes.length}`);
       scenes[i].audio = await makeVoice(scenes[i].narration, c, actx);
     }
     st.set("ভয়েস তৈরি শেষ"); st.ok();
 
-    st = step("ছবি তৈরি হচ্ছে (Nano Banana)");
+    st = cur = step("ছবি তৈরি হচ্ছে (Nano Banana)");
     let failed = 0;
     for (let i = 0; i < scenes.length; i++) {
       st.set(`ছবি তৈরি হচ্ছে ${i + 1}/${scenes.length}`);
@@ -236,7 +284,7 @@ $("btnSend").onclick = async () => {
     }
     st.set(failed ? `ছবি তৈরি শেষ (${failed}টি ব্যর্থ, সেখানে সাধারণ ব্যাকগ্রাউন্ড)` : "ছবি তৈরি শেষ"); st.ok();
 
-    st = step("ভিডিও জোড়া লাগানো হচ্ছে (রেকর্ডিং চলছে, ট্যাব খোলা রাখুন)");
+    st = cur = step("ভিডিও জোড়া লাগানো হচ্ছে (রেকর্ডিং চলছে, ট্যাব খোলা রাখুন)");
     const { blob, ext, total } = await composeVideo(scenes, c, actx);
     st.set(`ভিডিও তৈরি শেষ (${Math.round(total)} সেকেন্ড)`); st.ok();
 
@@ -260,9 +308,9 @@ $("btnSend").onclick = async () => {
     }
   } catch (e) {
     console.error(e);
-    addMsg("bot err", "ত্রুটি: " + esc(e.message || e) + "<br>API Key, মডেলের নাম বা কোটা দেখে আবার চেষ্টা করুন।");
+    addMsg("bot err", "ত্রুটি: " + esc(e.message || e) + "<br>আবার চেষ্টা করলে কাজ না-করা Key/মডেল বাদ দিয়ে সুইচ করবে।");
   } finally {
-    actx.close(); busy = false; $("btnSend").disabled = false;
+    notify = () => {}; actx.close(); busy = false; $("btnSend").disabled = false;
   }
 };
 $("prompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("btnSend").click(); } });
