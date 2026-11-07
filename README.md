@@ -15,6 +15,11 @@ No server and no install. Everything except the Gemini API calls runs on your de
 ### Run
 Open `app/index.html` in Chrome, or host the `app/` folder on GitHub Pages. Tap the gear icon and paste your Gemini API key (from Google AI Studio). The key stays in your browser's localStorage.
 
+### Android APK
+Every push to `main` builds `Daily-Edit.apk` with GitHub Actions (Capacitor, debug-signed) and publishes it at
+`https://github.com/alamgirabdullahgh/Daily-Editing/releases/latest`. Open that page on your phone, download the APK and install it (allow "install unknown apps" for your browser when asked).
+In the app, the finished video is saved/shared through the Android share sheet.
+
 ### Notes
 - Model names are editable in settings, because Google renames models often.
 - Recording happens in real time: a 60-second video takes about 60 seconds to assemble. Keep the tab open.

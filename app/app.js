@@ -246,11 +246,18 @@ $("btnSend").onclick = async () => {
       const t = document.createElement("canvas"); t.width = 160; t.height = Math.round(160 * s.img.height / s.img.width);
       t.getContext("2d").drawImage(s.img, 0, 0, t.width, t.height); return `<img src="${t.toDataURL("image/jpeg", .7)}">`;
     }).join("");
-    addMsg("bot", `<b>${esc(script.title)}</b>
+    const card = addMsg("bot", `<b>${esc(script.title)}</b>
       <video src="${url}" controls playsinline></video>
-      <a class="dl" href="${url}" download="${esc(name)}">⬇️ ডাউনলোড</a>
+      <a class="dl" id="dlBtn" href="${url}" download="${esc(name)}">${window.DailyNative ? "💾 সেভ / শেয়ার" : "⬇️ ডাউনলোড"}</a>
       <div class="thumbs">${thumbs}</div>
       <details class="script"><summary>স্ক্রিপ্ট দেখুন</summary>${scenes.map((s, i) => `<p>${i + 1}. ${esc(s.narration)}</p>`).join("")}</details>`);
+    if (window.DailyNative) {
+      card.querySelector("#dlBtn").onclick = async (ev) => {
+        ev.preventDefault();
+        try { await window.DailyNative.save(blob, name); }
+        catch (e) { addMsg("bot err", "সেভ করা যায়নি: " + esc(e.message || e)); }
+      };
+    }
   } catch (e) {
     console.error(e);
     addMsg("bot err", "ত্রুটি: " + esc(e.message || e) + "<br>API Key, মডেলের নাম বা কোটা দেখে আবার চেষ্টা করুন।");
