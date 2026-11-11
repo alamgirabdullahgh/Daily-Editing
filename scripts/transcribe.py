@@ -1,4 +1,5 @@
 import os, sys, json, subprocess, re, pathlib
+sys.excepthook = lambda t, v, tb: print("::error::" + (t.__name__ + ": " + str(v))[:380].replace("\n", " "))
 
 def err(m):
     print("::error::" + str(m).replace("\n", " ")[:380]); sys.exit(1)
