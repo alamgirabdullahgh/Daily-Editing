@@ -1,0 +1,36 @@
+name: Dub 1 - Download and transcribe
+
+# ধাপ ১: ভিডিও নামায়, কথা থেকে লেখা বের করে (segments.json), ভিডিও একটি Release-এ রাখে।
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "YouTube লিংক"
+        required: true
+      lang:
+        description: "ভিডিওর ভাষা (ar, en, bn ...)"
+        default: "ar"
+      model:
+        description: "Whisper মডেল (small বা medium)"
+        default: "small"
+
+permissions:
+  contents: write
+
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -U yt-dlp faster-whisper
+      - name: Run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ inputs.url }}
+          LANG_CODE: ${{ inputs.lang }}
+          MODEL: ${{ inputs.model }}
+        run: python scripts/transcribe.py
