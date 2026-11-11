@@ -41,7 +41,10 @@ dur = float(sh(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-
 
 from faster_whisper import WhisperModel
 m = WhisperModel(model, device="cpu", compute_type="int8")
-segs, info = m.transcribe(str(wav), language=lang, vad_filter=True, beam_size=5)
+import wave, numpy as np
+with wave.open(str(wav), "rb") as wf:
+    audio = np.frombuffer(wf.readframes(wf.getnframes()), dtype=np.int16).astype(np.float32) / 32768.0
+segs, info = m.transcribe(audio, language=lang, vad_filter=True, beam_size=5)
 out = []
 for i, s in enumerate(segs, 1):
     t = s.text.strip()
