@@ -13,6 +13,16 @@ if f:
     vid = "f" + hashlib.md5(open(f, "rb").read(1 << 20)).hexdigest()[:10]
     work = pathlib.Path("work") / vid; work.mkdir(parents=True, exist_ok=True)
     mp4 = work / "video.mp4"; shutil.copy(f, mp4)
+elif "drive.google.com" in url:
+    m_ = re.search(r"/d/([\w-]+)|[?&]id=([\w-]+)", url)
+    if not m_: err("ড্রাইভ লিংক থেকে ফাইল আইডি পাওয়া যায়নি")
+    fid = m_.group(1) or m_.group(2)
+    vid = "g" + fid[:12]
+    work = pathlib.Path("work") / vid; work.mkdir(parents=True, exist_ok=True)
+    mp4 = work / "video.mp4"
+    r = sh(["gdown", "--id", fid, "-O", str(mp4)])
+    if not mp4.exists() or mp4.stat().st_size < 10000:
+        err("ড্রাইভ থেকে নামানো যায়নি (শেয়ার সেটিং 'যে কেউ লিংক দিয়ে' আছে কিনা দেখুন): " + (r.stderr or "")[-250:])
 else:
     r = sh(["yt-dlp", "--get-id", url])
     vid = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
