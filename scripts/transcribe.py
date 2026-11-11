@@ -20,7 +20,7 @@ elif "drive.google.com" in url:
     vid = "g" + fid[:12]
     work = pathlib.Path("work") / vid; work.mkdir(parents=True, exist_ok=True)
     mp4 = work / "video.mp4"
-    r = sh(["gdown", "--id", fid, "-O", str(mp4)])
+    r = sh(["gdown", fid, "-O", str(mp4)])
     if not mp4.exists() or mp4.stat().st_size < 10000:
         err("ড্রাইভ থেকে নামানো যায়নি (শেয়ার সেটিং 'যে কেউ লিংক দিয়ে' আছে কিনা দেখুন): " + (r.stderr or "")[-250:])
 else:
