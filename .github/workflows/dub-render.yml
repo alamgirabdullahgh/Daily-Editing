@@ -30,8 +30,8 @@ jobs:
       - name: Install tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg fonts-noto-core
-          python -m pip install edge-tts numpy
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install edge-tts numpy pillow
       - name: Render
         env:
           GH_TOKEN: ${{ github.token }}

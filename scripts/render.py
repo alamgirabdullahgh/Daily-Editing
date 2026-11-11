@@ -75,11 +75,42 @@ with open(srt, "w", encoding="utf-8") as f:
         f.write(f"{k}\n{ts(a)} --> {ts(b)}\n{wrap(t)}\n\n")
 
 out = w / "final.mp4"
-style = "FontName=Noto Sans Bengali,FontSize=18,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,Outline=2,Shadow=0,MarginV=28"
-r = sh(["ffmpeg", "-y", "-v", "error", "-i", str(src), "-i", str(dub),
-        "-filter_complex", f"[0:a]volume=0.10[o];[1:a]volume=1.4[d];[o][d]amix=inputs=2:duration=first:normalize=0[a];"
-                           f"[0:v]subtitles={srt}:force_style='{style}'[v]",
-        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "23", "-preset", "medium", "-c:a", "aac", "-b:a", "160k", str(out)])
+from PIL import Image, ImageDraw, ImageFont
+pr = sh(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", str(src)]).stdout.strip().split(",")
+W, H = int(pr[0]), int(pr[1])
+fsz = max(22, W // 17)
+font = ImageFont.truetype("assets/NotoSansBengali-Bold.ttf", fsz, layout_engine=ImageFont.Layout.RAQM)
+def clean(t): return t.replace(",", "").replace("،", "").replace(".", "।").replace("।।", "।")
+def wrap_px(t, maxw):
+    lines, cur = [], ""
+    for x in clean(t).split():
+        trial = (cur + " " + x).strip()
+        if font.getlength(trial) > maxw and cur: lines.append(cur); cur = x
+        else: cur = trial
+    if cur: lines.append(cur)
+    return lines
+pngs = []
+for k, (a_, b_, t) in enumerate(subs):
+    lines = wrap_px(t, W * 0.92)
+    lh = int(fsz * 1.35)
+    im = Image.new("RGBA", (W, lh * len(lines) + 12), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    for j, ln in enumerate(lines):
+        tw = font.getlength(ln)
+        d.text(((W - tw) / 2, 4 + j * lh), ln, font=font, fill=(255, 255, 255, 255), stroke_width=3, stroke_fill=(0, 0, 0, 255))
+    pth = w / f"s{k}.png"; im.save(pth); pngs.append((pth, im.height, a_, b_))
+cmd = ["ffmpeg", "-y", "-v", "error", "-i", str(src), "-i", str(dub)]
+for pth, *_ in pngs: cmd += ["-i", str(pth)]
+fc = "[0:a]volume=0.10[o];[1:a]volume=1.4[d];[o][d]amix=inputs=2:duration=first:normalize=0[a];"
+prev = "0:v"
+for k, (pth, h_, a_, b_) in enumerate(pngs):
+    nxt_l = f"v{k}"
+    fc += f"[{prev}][{k+2}:v]overlay=0:{H - h_ - int(H*0.04)}:enable='between(t,{a_:.2f},{b_:.2f})'[{nxt_l}];"
+    prev = nxt_l
+fc = fc.rstrip(";")
+cmd += ["-filter_complex", fc, "-map", f"[{prev}]", "-map", "[a]", "-c:v", "libx264", "-crf", "23", "-preset", "veryfast",
+        "-c:a", "aac", "-b:a", "160k", str(out)]
+r = sh(cmd)
 if not out.exists(): err("ভিডিও বানানো যায়নি: " + r.stderr[-300:])
 final = w / f"dubbed-bn-{vid}.mp4"; out.rename(final)
 r = sh(["gh", "release", "upload", tag, str(final), str(srt), "--clobber"])
