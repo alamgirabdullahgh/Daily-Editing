@@ -5,8 +5,13 @@ on:
   workflow_dispatch:
     inputs:
       url:
-        description: "YouTube লিংক"
-        required: true
+        description: "YouTube লিংক (ফাইল দিলে ফাঁকা রাখুন)"
+        required: false
+        default: ""
+      file:
+        description: "রিপোতে রাখা ভিডিওর পথ, যেমন input/video.mp4"
+        required: false
+        default: ""
       lang:
         description: "ভিডিওর ভাষা (ar, en, bn ...)"
         default: "ar"
@@ -31,6 +36,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           URL: ${{ inputs.url }}
+          FILE: ${{ inputs.file }}
           LANG_CODE: ${{ inputs.lang }}
           MODEL: ${{ inputs.model }}
         run: python scripts/transcribe.py

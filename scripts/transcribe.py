@@ -6,16 +6,24 @@ def sh(cmd, **k):
     return subprocess.run(cmd, check=False, text=True, capture_output=True, **k)
 
 url, lang, model = os.environ["URL"], os.environ["LANG_CODE"], os.environ["MODEL"]
-r = sh(["yt-dlp", "--get-id", url])
-vid = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
-if not re.fullmatch(r"[\w-]{6,20}", vid):
-    err("ভিডিও আইডি পাওয়া যায়নি: " + (r.stderr or "")[-250:])
-work = pathlib.Path("work") / vid; work.mkdir(parents=True, exist_ok=True)
-mp4 = work / "video.mp4"
-r = sh(["yt-dlp", "-f", "bv*[height<=720]+ba/b[height<=720]/b", "--merge-output-format", "mp4",
-        "--extractor-args", "youtube:player_client=tv,web_safari,ios", "-o", str(mp4), url])
-if not mp4.exists():
-    err("ডাউনলোড ব্যর্থ (YouTube বট-সুরক্ষা হতে পারে): " + (r.stderr or "")[-280:])
+f = os.environ.get("FILE", "").strip()
+import shutil, hashlib
+if f:
+    if not os.path.isfile(f): err("ফাইল পাওয়া যায়নি: " + f)
+    vid = "f" + hashlib.md5(open(f, "rb").read(1 << 20)).hexdigest()[:10]
+    work = pathlib.Path("work") / vid; work.mkdir(parents=True, exist_ok=True)
+    mp4 = work / "video.mp4"; shutil.copy(f, mp4)
+else:
+    r = sh(["yt-dlp", "--get-id", url])
+    vid = r.stdout.strip().splitlines()[-1] if r.stdout.strip() else ""
+    if not re.fullmatch(r"[\w-]{6,20}", vid):
+        err("ভিডিও আইডি পাওয়া যায়নি: " + (r.stderr or "")[-250:])
+    work = pathlib.Path("work") / vid; work.mkdir(parents=True, exist_ok=True)
+    mp4 = work / "video.mp4"
+    r = sh(["yt-dlp", "-f", "bv*[height<=720]+ba/b[height<=720]/b", "--merge-output-format", "mp4",
+            "--extractor-args", "youtube:player_client=tv,web_safari,ios", "-o", str(mp4), url])
+    if not mp4.exists():
+        err("ডাউনলোড ব্যর্থ (YouTube বট-সুরক্ষা হতে পারে): " + (r.stderr or "")[-280:])
 wav = work / "audio.wav"
 sh(["ffmpeg", "-y", "-i", str(mp4), "-vn", "-ac", "1", "-ar", "16000", str(wav)])
 dur = float(sh(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(mp4)]).stdout.strip() or 0)
